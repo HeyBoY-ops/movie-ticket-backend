@@ -5,26 +5,26 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
   name      String
   email     String    @unique
   password  String
-  role      String    @default("user")   // ⭐ ADDED
+  role      String    @default("user")
   createdAt DateTime  @default(now())
 
   bookings  Booking[]
 }
 
 model Movie {
-  id           Int       @id @default(autoincrement())
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
   title        String
   description  String?
-  genre        Json?                      // ⭐ FIXED (should be array)
+  genre        Json?
   language     String?
   duration     Int?
   rating       Float?
@@ -32,14 +32,14 @@ model Movie {
   trailer_url  String?
   release_date DateTime?
   director     String?
-  cast         Json?                      // ⭐ FIXED (should be array)
-  createdAt    DateTime  @default(now())
+  cast         Json?
+  createdAt    DateTime @default(now())
 
   shows        Show[]
 }
 
 model Theater {
-  id            Int       @id @default(autoincrement())
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
   name          String
   city          String
   address       String
@@ -49,9 +49,9 @@ model Theater {
 }
 
 model Show {
-  id            Int       @id @default(autoincrement())
-  movie_id      Int
-  theater_id    Int
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  movie_id      String    @db.ObjectId
+  theater_id    String    @db.ObjectId
   screen_number Int
   show_date     DateTime
   show_time     String
@@ -65,9 +65,9 @@ model Show {
 }
 
 model Booking {
-  id             Int       @id @default(autoincrement())
-  user_id        Int
-  show_id        Int
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  user_id        String    @db.ObjectId
+  show_id        String    @db.ObjectId
   seats          Json      @default("[]")
   total_amount   Float
   payment_method String

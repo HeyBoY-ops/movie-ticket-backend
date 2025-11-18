@@ -11,9 +11,8 @@ import movieRoutes from "./routes/movieRoutes.js";
 dotenv.config();
 
 const app = express();
-export const prisma = new PrismaClient();   // <<<<<< NEW
+export const prisma = new PrismaClient();   
 
-// Remove MySQL connectDB (not needed anymore)
 
 // middleware setup
 app.use(express.json({ limit: "10mb" }));
@@ -21,7 +20,10 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: [
+      "http://localhost:5173",
+      "https://movie-ticket-app-drab.vercel.app/login"
+    ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -30,15 +32,10 @@ app.use(
 
 
 
-// health check
-app.get("/", async (req, res) => {
-  try {
-    await prisma.$connect();
-    res.status(200).send("Backend running with Prisma + MySQL");
-  } catch (err) {
-    res.status(500).send("DB connection failed");
-  }
+app.get("/", (req, res) => {
+  res.send("Backend running with Prisma + MongoDB");
 });
+
 
 // routes
 app.use("/api/auth", authRoutes);
@@ -59,4 +56,10 @@ const PORT = process.env.PORT || 5050;
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
+});
+
+//avoid prisma crashes
+process.on("SIGINT", async () => {
+  await prisma.$disconnect();
+  process.exit();
 });
