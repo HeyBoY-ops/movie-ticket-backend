@@ -1,0 +1,79 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  password  String
+  role      String    @default("user")   // ⭐ ADDED
+  createdAt DateTime  @default(now())
+
+  bookings  Booking[]
+}
+
+model Movie {
+  id           Int       @id @default(autoincrement())
+  title        String
+  description  String?
+  genre        Json?                      // ⭐ FIXED (should be array)
+  language     String?
+  duration     Int?
+  rating       Float?
+  poster_url   String?
+  trailer_url  String?
+  release_date DateTime?
+  director     String?
+  cast         Json?                      // ⭐ FIXED (should be array)
+  createdAt    DateTime  @default(now())
+
+  shows        Show[]
+}
+
+model Theater {
+  id            Int       @id @default(autoincrement())
+  name          String
+  city          String
+  address       String
+  total_screens Int
+
+  shows         Show[]
+}
+
+model Show {
+  id            Int       @id @default(autoincrement())
+  movie_id      Int
+  theater_id    Int
+  screen_number Int
+  show_date     DateTime
+  show_time     String
+  total_seats   Int
+  price         Float
+  booked_seats  Json      @default("[]")
+
+  movie         Movie     @relation(fields: [movie_id], references: [id])
+  theater       Theater   @relation(fields: [theater_id], references: [id])
+  bookings      Booking[]
+}
+
+model Booking {
+  id             Int       @id @default(autoincrement())
+  user_id        Int
+  show_id        Int
+  seats          Json      @default("[]")
+  total_amount   Float
+  payment_method String
+  booking_status String    @default("confirmed")
+  createdAt      DateTime  @default(now())
+
+  user           User      @relation(fields: [user_id], references: [id])
+  show           Show      @relation(fields: [show_id], references: [id])
+}
