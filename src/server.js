@@ -23,7 +23,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://movie-ticket-gfcrrajhv-abhisheks-projects-a1a026b5.vercel.app"
+      "https://movie-ticket-app-drab.vercel.app/login"
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
