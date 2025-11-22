@@ -11,7 +11,7 @@ import movieRoutes from "./routes/movieRoutes.js";
 dotenv.config();
 
 const app = express();
-export const prisma = new PrismaClient();   
+export const prisma = new PrismaClient();
 
 
 // middleware setup
@@ -23,7 +23,8 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://movie-ticket-app-drab.vercel.app"
+      "https://movie-ticket-app-drab.vercel.app",
+      "https://movie-ticket-backend-d25t.onrender.com"
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
