@@ -7,6 +7,9 @@ import { PrismaClient } from "@prisma/client";
 // Routes
 import authRoutes from "./routes/authRoutes.js";
 import movieRoutes from "./routes/movieRoutes.js";
+import theaterRoutes from "./routes/theaterRoutes.js";
+import showRoutes from "./routes/showRoutes.js";
+import bookingRoutes from "./routes/bookingRoutes.js";
 
 dotenv.config();
 
@@ -42,6 +45,9 @@ app.get("/", (req, res) => {
 // routes
 app.use("/api/auth", authRoutes);
 app.use("/api/movies", movieRoutes);
+app.use("/api/theaters", theaterRoutes);
+app.use("/api/shows", showRoutes);
+app.use("/api/bookings", bookingRoutes);
 
 // 404 handler
 app.use((req, res) => {

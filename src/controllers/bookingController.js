@@ -23,7 +23,7 @@ export const createBooking = async (req, res) => {
       user_id,
       show_id,
       seats,
-      total_amount: seats.length * show.price,
+      total_amount: req.body.total_amount || (seats.length * show.price),
       payment_method,
       booking_status: "confirmed",
     },
@@ -36,14 +36,22 @@ export const getBookings = async (req, res) => {
   const user_id = req.user.id;
   const bookings = await prisma.booking.findMany({
     where: { user_id },
-    include: { movie: true, theater: true, show: true },
+    include: {
+      show: {
+        include: {
+          movie: true,
+          theater: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
   });
   res.json(bookings);
 };
 
 export const cancelBooking = async (req, res) => {
   const booking = await prisma.booking.update({
-    where: { id: Number(req.params.id) },
+    where: { id: req.params.id },
     data: { booking_status: "cancelled" },
   });
 
@@ -52,8 +60,15 @@ export const cancelBooking = async (req, res) => {
 
 export const getBooking = async (req, res) => {
   const booking = await prisma.booking.findUnique({
-    where: { id: Number(req.params.id) },
-    include: { movie: true, theater: true, show: true },
+    where: { id: req.params.id },
+    include: {
+      show: {
+        include: {
+          movie: true,
+          theater: true,
+        },
+      },
+    },
   });
 
   res.json(booking);

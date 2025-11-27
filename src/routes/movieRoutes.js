@@ -1,22 +1,17 @@
 import express from "express";
 import { prisma } from "../server.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
+import { adminMiddleware } from "../middleware/adminMiddleware.js";
 
 const router = express.Router();
 
 /* ------------------------- HELPERS ------------------------- */
 
-const safeNumber = (value) => {
-  const n = Number(value);
-  return isNaN(n) ? null : n;
-};
 
 /* ------------------------- GET ALL MOVIES ------------------------- */
 router.get("/", async (req, res) => {
   try {
-    const movies = await prisma.movie.findMany({
-      orderBy: { id: "desc" },
-    });
-
+    const movies = await prisma.movie.findMany({ orderBy: { id: "desc" } });
     res.status(200).json({ movies });
   } catch (err) {
     console.error("GET /movies error:", err);
@@ -26,21 +21,14 @@ router.get("/", async (req, res) => {
 
 /* ------------------------- GET MOVIE BY ID ------------------------- */
 router.get("/:id", async (req, res) => {
-  const id = safeNumber(req.params.id);
+  const { id } = req.params;
   if (!id) return res.status(400).json({ error: "Invalid movie ID" });
-
   try {
     const movie = await prisma.movie.findUnique({
       where: { id },
-      include: {
-        shows: true,
-      },
+      include: { shows: true },
     });
-
-    if (!movie) {
-      return res.status(404).json({ error: "Movie not found" });
-    }
-
+    if (!movie) return res.status(404).json({ error: "Movie not found" });
     res.status(200).json(movie);
   } catch (err) {
     console.error("GET /movies/:id error:", err);
@@ -49,7 +37,7 @@ router.get("/:id", async (req, res) => {
 });
 
 /* ------------------------- CREATE MOVIE ------------------------- */
-router.post("/", async (req, res) => {
+router.post("/", authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const {
       title,
@@ -64,13 +52,7 @@ router.post("/", async (req, res) => {
       director,
       cast,
     } = req.body;
-
-    console.log("POST MOVIE HIT");
-
-    if (!title) {
-      return res.status(400).json({ error: "Title is required" });
-    }
-
+    if (!title) return res.status(400).json({ error: "Title is required" });
     const movie = await prisma.movie.create({
       data: {
         title,
@@ -79,17 +61,13 @@ router.post("/", async (req, res) => {
         poster_url,
         trailer_url,
         director,
-
-        // FIX: convert arrays to strings
-        genre: Array.isArray(genre) ? genre.join(", ") : genre,
-        cast: Array.isArray(cast) ? cast.join(", ") : cast,
-
+        genre: Array.isArray(genre) ? genre : [genre], // Ensure array
+        cast: Array.isArray(cast) ? cast : [cast], // Ensure array (Json type but usually array)
         duration: duration ? Number(duration) : null,
         rating: rating ? Number(rating) : null,
         release_date: release_date ? new Date(release_date) : null,
       },
     });
-
     res.status(201).json(movie);
   } catch (err) {
     console.error("POST /movies error:", err);
@@ -97,58 +75,44 @@ router.post("/", async (req, res) => {
   }
 });
 
-
 /* ------------------------- UPDATE MOVIE ------------------------- */
-router.put("/:id", async (req, res) => {
-  const id = safeNumber(req.params.id);
+router.put("/:id", authMiddleware, adminMiddleware, async (req, res) => {
+  const { id } = req.params;
   if (!id) return res.status(400).json({ error: "Invalid movie ID" });
-
   try {
     const data = { ...req.body };
-
-    // Convert arrays → strings
-    if (Array.isArray(data.genre)) data.genre = data.genre.join(", ");
-    if (Array.isArray(data.cast)) data.cast = data.cast.join(", ");
+    // Ensure genre is array
+    if (data.genre) {
+      data.genre = Array.isArray(data.genre) ? data.genre : [data.genre];
+    }
+    // Cast is Json, but let's keep it as array if passed as such
+    if (data.cast && !Array.isArray(data.cast)) {
+      data.cast = [data.cast];
+    }
 
     if (data.duration) data.duration = Number(data.duration);
     if (data.rating) data.rating = Number(data.rating);
     if (data.release_date) data.release_date = new Date(data.release_date);
 
-    const movie = await prisma.movie.update({
-      where: { id },
-      data,
-    });
-
+    const movie = await prisma.movie.update({ where: { id }, data });
     res.status(200).json(movie);
   } catch (err) {
     console.error("PUT /movies/:id error:", err);
-
-    if (err.code === "P2025")
-      return res.status(404).json({ error: "Movie not found" });
-
+    if (err.code === "P2025") return res.status(404).json({ error: "Movie not found" });
     res.status(500).json({ error: "Failed to update movie" });
   }
 });
 
-
 /* ------------------------- DELETE MOVIE ------------------------- */
-router.delete("/:id", async (req, res) => {
-  const id = safeNumber(req.params.id);
+router.delete("/:id", authMiddleware, adminMiddleware, async (req, res) => {
+  const { id } = req.params;
   if (!id) return res.status(400).json({ error: "Invalid movie ID" });
-
   try {
-    await prisma.movie.delete({
-      where: { id },
-    });
-
+    await prisma.movie.delete({ where: { id } });
     res.json({ message: "Movie deleted" });
   } catch (err) {
     console.error("DELETE /movies/:id error:", err);
-
-    if (err.code === "P2025") {
-      return res.status(404).json({ error: "Movie not found" });
-    }
-
+    if (err.code === "P2025") return res.status(404).json({ error: "Movie not found" });
     res.status(500).json({ error: "Failed to delete movie" });
   }
 });

@@ -7,7 +7,7 @@ export const getMovies = async (req, res) => {
 
 export const getMovie = async (req, res) => {
   const movie = await prisma.movie.findUnique({
-    where: { id: Number(req.params.id) },
+    where: { id: req.params.id },
     include: { shows: true },
   });
 
@@ -23,13 +23,13 @@ export const createMovie = async (req, res) => {
 
 export const updateMovie = async (req, res) => {
   const movie = await prisma.movie.update({
-    where: { id: Number(req.params.id) },
+    where: { id: req.params.id },
     data: req.body,
   });
   res.json(movie);
 };
 
 export const deleteMovie = async (req, res) => {
-  await prisma.movie.delete({ where: { id: Number(req.params.id) } });
+  await prisma.movie.delete({ where: { id: req.params.id } });
   res.json({ message: "Movie deleted" });
 };

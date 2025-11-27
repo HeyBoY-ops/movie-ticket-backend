@@ -12,13 +12,13 @@ export const createTheater = async (req, res) => {
 
 export const updateTheater = async (req, res) => {
   const t = await prisma.theater.update({
-    where: { id: Number(req.params.id) },
+    where: { id: req.params.id },
     data: req.body,
   });
   res.json(t);
 };
 
 export const deleteTheater = async (req, res) => {
-  await prisma.theater.delete({ where: { id: Number(req.params.id) } });
+  await prisma.theater.delete({ where: { id: req.params.id } });
   res.json({ message: "Theater deleted" });
 };

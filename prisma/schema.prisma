@@ -24,7 +24,7 @@ model Movie {
   id           String    @id @default(auto()) @map("_id") @db.ObjectId
   title        String
   description  String?
-  genre        Json?
+  genre        String[]
   language     String?
   duration     Int?
   rating       Float?

