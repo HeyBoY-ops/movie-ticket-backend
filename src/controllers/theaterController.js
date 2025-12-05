@@ -1,24 +1,90 @@
 import { prisma } from "../server.js";
 
 export const getTheaters = async (req, res) => {
-  const theaters = await prisma.theater.findMany();
-  res.json(theaters);
+  try {
+    const theaters = await prisma.theater.findMany();
+    res.json(theaters);
+  } catch (error) {
+    console.error("Error fetching theaters:", error);
+    res.status(500).json({ error: "Failed to fetch theaters" });
+  }
 };
 
 export const createTheater = async (req, res) => {
-  const t = await prisma.theater.create({ data: req.body });
-  res.json(t);
+  try {
+    const { name, city, address, total_screens } = req.body;
+    if (!name || !city || !address) {
+      return res.status(400).json({ error: "Name, city, and address are required" });
+    }
+    const theater = await prisma.theater.create({ 
+      data: {
+        name,
+        city,
+        address,
+        total_screens: total_screens || 1,
+      }
+    });
+    res.status(201).json(theater);
+  } catch (error) {
+    console.error("Error creating theater:", error);
+    res.status(500).json({ error: "Failed to create theater" });
+  }
 };
 
 export const updateTheater = async (req, res) => {
-  const t = await prisma.theater.update({
-    where: { id: req.params.id },
-    data: req.body,
-  });
-  res.json(t);
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: "Invalid theater ID" });
+    
+    const theater = await prisma.theater.update({
+      where: { id },
+      data: req.body,
+    });
+    res.status(200).json(theater);
+  } catch (error) {
+    console.error("Error updating theater:", error);
+    if (error.code === "P2025") return res.status(404).json({ error: "Theater not found" });
+    res.status(500).json({ error: "Failed to update theater" });
+  }
 };
 
 export const deleteTheater = async (req, res) => {
-  await prisma.theater.delete({ where: { id: req.params.id } });
-  res.json({ message: "Theater deleted" });
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: "Invalid theater ID" });
+
+    // Check if theater exists
+    const theater = await prisma.theater.findUnique({
+      where: { id },
+      include: { shows: true },
+    });
+
+    if (!theater) {
+      return res.status(404).json({ error: "Theater not found" });
+    }
+
+    // Delete all associated shows and bookings first (cascade delete)
+    if (theater.shows && theater.shows.length > 0) {
+      // Delete all bookings for these shows
+      const showIds = theater.shows.map((show) => show.id);
+      await prisma.booking.deleteMany({
+        where: { show_id: { in: showIds } },
+      });
+      
+      // Delete all shows
+      await prisma.show.deleteMany({
+        where: { theater_id: id },
+      });
+    }
+
+    // Now delete the theater
+    await prisma.theater.delete({ where: { id } });
+    res.status(200).json({ message: "Theater deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting theater:", error);
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Theater not found" });
+    }
+    res.status(500).json({ error: error.message || "Failed to delete theater" });
+  }
 };
