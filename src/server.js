@@ -10,6 +10,7 @@ import movieRoutes from "./routes/movieRoutes.js";
 import theaterRoutes from "./routes/theaterRoutes.js";
 import showRoutes from "./routes/showRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 
 dotenv.config();
 
@@ -48,6 +49,7 @@ app.use("/api/movies", movieRoutes);
 app.use("/api/theaters", theaterRoutes);
 app.use("/api/shows", showRoutes);
 app.use("/api/bookings", bookingRoutes);
+app.use("/api/admin", adminRoutes);
 
 // 404 handler
 app.use((req, res) => {

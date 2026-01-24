@@ -8,6 +8,7 @@ export const getMovies = async (req, res) => {
       search = "",
       genre = "",
       language = "",
+      category = "",
       sort_by = "release_date",
     } = req.query;
 
@@ -27,6 +28,10 @@ export const getMovies = async (req, res) => {
 
     if (language) {
       where.language = { equals: language, mode: "insensitive" };
+    }
+
+    if (category) {
+      where.category = { equals: category };
     }
 
     let orderBy = {};
@@ -72,7 +77,7 @@ export const getMovie = async (req, res) => {
   try {
     const { id } = req.params;
     if (!id) return res.status(400).json({ error: "Invalid movie ID" });
-    
+
     const movie = await prisma.movie.findUnique({
       where: { id },
       include: { shows: true },
@@ -101,10 +106,11 @@ export const createMovie = async (req, res) => {
       release_date,
       director,
       cast,
+      category,
     } = req.body;
-    
+
     if (!title) return res.status(400).json({ error: "Title is required" });
-    
+
     const movie = await prisma.movie.create({
       data: {
         title,
@@ -118,9 +124,10 @@ export const createMovie = async (req, res) => {
         duration: duration ? Number(duration) : null,
         rating: rating ? Number(rating) : null,
         release_date: release_date ? new Date(release_date) : null,
+        category: category || "MOVIE",
       },
     });
-    
+
     res.status(201).json(movie);
   } catch (error) {
     console.error("Error creating movie:", error);
@@ -132,7 +139,7 @@ export const updateMovie = async (req, res) => {
   try {
     const { id } = req.params;
     if (!id) return res.status(400).json({ error: "Invalid movie ID" });
-    
+
     const data = { ...req.body };
     // Ensure genre is array
     if (data.genre) {
@@ -160,7 +167,7 @@ export const deleteMovie = async (req, res) => {
   try {
     const { id } = req.params;
     if (!id) return res.status(400).json({ error: "Invalid movie ID" });
-    
+
     // Check if movie exists
     const movie = await prisma.movie.findUnique({
       where: { id },
@@ -178,7 +185,7 @@ export const deleteMovie = async (req, res) => {
       await prisma.booking.deleteMany({
         where: { show_id: { in: showIds } },
       });
-      
+
       // Delete all shows
       await prisma.show.deleteMany({
         where: { movie_id: id },

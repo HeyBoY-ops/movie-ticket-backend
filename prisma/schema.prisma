@@ -9,12 +9,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  USER
+  ADMIN
+  ORGANIZATION
+}
+
 model User {
   id        String    @id @default(auto()) @map("_id") @db.ObjectId
   name      String
   email     String    @unique
   password  String
-  role      String    @default("user")
+  role      Role      @default(USER)
+  isVerified Boolean  @default(false)
+  organizationDetails Json?
   createdAt DateTime  @default(now())
 
   bookings  Booking[]
@@ -33,6 +41,9 @@ model Movie {
   release_date DateTime?
   director     String?
   cast         Json?
+  isFlagged    Boolean  @default(false)
+  ownerId      String?  @db.ObjectId
+  category     String   @default("MOVIE")
   createdAt    DateTime @default(now())
 
   shows        Show[]
@@ -44,6 +55,7 @@ model Theater {
   city          String
   address       String
   total_screens Int
+  ownerId       String?   @db.ObjectId
 
   shows         Show[]
 }
@@ -64,6 +76,7 @@ model Show {
   bookings      Booking[]
 }
 
+
 model Booking {
   id             String    @id @default(auto()) @map("_id") @db.ObjectId
   user_id        String    @db.ObjectId
@@ -76,4 +89,15 @@ model Booking {
 
   user           User      @relation(fields: [user_id], references: [id])
   show           Show      @relation(fields: [show_id], references: [id])
+}
+
+// TTL Index must be manually created on createdAt for automatic expiration (e.g. 10 mins)
+model SeatLock {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  showId     String
+  seatNumber String
+  userId     String
+  createdAt  DateTime @default(now())
+
+  @@unique([showId, seatNumber])
 }
