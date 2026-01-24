@@ -1,4 +1,4 @@
-import { prisma } from "../server.js";
+import prisma from "../config/db.js";
 
 export const getShows = async (req, res) => {
   try {
@@ -19,14 +19,14 @@ export const getShow = async (req, res) => {
   try {
     const { id } = req.params;
     if (!id) return res.status(400).json({ error: "Invalid show ID" });
-    
+
     const show = await prisma.show.findUnique({
       where: { id },
       include: { movie: true, theater: true },
     });
-    
+
     if (!show) return res.status(404).json({ error: "Show not found" });
-    
+
     res.json(show);
   } catch (error) {
     console.error("Error fetching show:", error);
@@ -37,11 +37,11 @@ export const getShow = async (req, res) => {
 export const createShow = async (req, res) => {
   try {
     const { show_date, movie_id, theater_id, screen_number, show_time, total_seats, price } = req.body;
-    
+
     if (!movie_id || !theater_id || !show_date || !show_time || !price) {
       return res.status(400).json({ error: "Missing required fields" });
     }
-    
+
     const show = await prisma.show.create({
       data: {
         movie_id,
@@ -65,7 +65,7 @@ export const updateShow = async (req, res) => {
   try {
     const { id } = req.params;
     if (!id) return res.status(400).json({ error: "Invalid show ID" });
-    
+
     const data = { ...req.body };
     if (data.show_date) {
       data.show_date = new Date(data.show_date);
@@ -73,7 +73,7 @@ export const updateShow = async (req, res) => {
     if (data.price) {
       data.price = Number(data.price);
     }
-    
+
     const show = await prisma.show.update({
       where: { id },
       data,

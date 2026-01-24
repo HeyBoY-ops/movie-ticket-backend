@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { prisma } from "../server.js";
+import prisma from "../config/db.js";
 import { generateToken } from "../utils/generateToken.js";
 
 /* =======================
@@ -32,7 +32,7 @@ export const signup = async (req, res) => {
         name: displayName,
         email,
         password: hash,
-        role: email === "a@gmail.com" ? "admin" : "user",
+        role: email === "a@gmail.com" ? "ADMIN" : "USER",
       },
     });
 

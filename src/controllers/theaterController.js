@@ -1,4 +1,4 @@
-import { prisma } from "../server.js";
+import prisma from "../config/db.js";
 
 export const getTheaters = async (req, res) => {
   try {

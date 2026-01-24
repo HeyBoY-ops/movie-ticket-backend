@@ -1,4 +1,4 @@
-import { prisma } from "../server.js";
+import prisma from "../config/db.js";
 
 // Verify an Entity (User or Organization)
 export const verifyEntity = async (req, res) => {

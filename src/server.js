@@ -15,7 +15,8 @@ import adminRoutes from "./routes/adminRoutes.js";
 dotenv.config();
 
 const app = express();
-export const prisma = new PrismaClient();
+import prisma from "./config/db.js";
+export { prisma };
 
 
 // middleware setup
