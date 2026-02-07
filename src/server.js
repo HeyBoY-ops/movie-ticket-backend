@@ -32,7 +32,7 @@ app.use(
       "https://movie-ticket-backend-d25t.onrender.com",
       "https://movie-ticket-hd97rm242-abhisheks-projects-a1a026b5.vercel.app"
     ],
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
@@ -40,8 +40,24 @@ app.use(
 
 
 
+
 app.get("/", (req, res) => {
   res.send("Backend running with Prisma + MongoDB");
+});
+
+// DEBUG ENDPOINT
+app.get("/api/debug/users", async (req, res) => {
+  try {
+    const count = await prisma.user.count();
+    const users = await prisma.user.findMany({ take: 5 });
+    res.json({
+      count,
+      dbUrl: process.env.DATABASE_URL ? "Loaded" : "Missing",
+      sample: users
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 
@@ -52,6 +68,8 @@ app.use("/api/theaters", theaterRoutes);
 app.use("/api/shows", showRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/admin", adminRoutes);
+import dashboardRoutes from "./routes/dashboardRoutes.js";
+app.use("/api/dashboard", dashboardRoutes);
 
 // 404 handler
 app.use((req, res) => {

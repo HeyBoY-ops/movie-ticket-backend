@@ -32,7 +32,7 @@ export const signup = async (req, res) => {
         name: displayName,
         email,
         password: hash,
-        role: email === "a@gmail.com" ? "ADMIN" : "USER",
+        role: email === "a@gmail.com" ? "SUPER_ADMIN" : "USER",
       },
     });
 
@@ -49,6 +49,7 @@ export const signup = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role, // <-- IMPORTANT
+      verificationStatus: user.verificationStatus, // <-- Added for immediate UI update
     };
 
     res.status(201).json({
@@ -59,6 +60,24 @@ export const signup = async (req, res) => {
   } catch (err) {
     console.error("Signup error:", err);
     res.status(500).json({ message: "Internal server error" });
+  }
+
+};
+
+/* =======================
+    REGISTER ORGANIZATION
+   ======================= */
+import { registerOrganization as registerOrgService } from "../services/authService.js";
+
+export const registerOrganization = async (req, res) => {
+  try {
+    const user = await registerOrgService(req.body);
+    res.status(201).json({ message: "Organization registered. Wait for verification.", user });
+  } catch (error) {
+    if (error.message === "User already exists") {
+      return res.status(409).json({ message: error.message });
+    }
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -99,6 +118,7 @@ export const login = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role, // <-- IMPORTANT
+      verificationStatus: user.verificationStatus, // <-- Added for immediate UI update
     };
 
     res.status(200).json({
@@ -128,6 +148,8 @@ export const me = async (req, res) => {
         name: true,
         email: true,
         role: true, // <-- IMPORTANT
+        verificationStatus: true,
+        organizationDetails: true,
         createdAt: true,
       },
     });

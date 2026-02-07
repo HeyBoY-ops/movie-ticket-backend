@@ -28,7 +28,7 @@ export const holdSeat = async (req, res) => {
       const show = await tx.show.findUnique({ where: { id: showId } });
       if (!show) throw new Error("Show not found");
 
-      const alreadyBooked = parseBookedSeats(show.booked_seats);
+      const alreadyBooked = parseBookedSeats(show.bookedSeats);
       const isBooked = seatNumbers.some(seat => alreadyBooked.includes(seat));
 
       if (isBooked) {
@@ -103,7 +103,7 @@ export const confirmBooking = async (req, res) => {
       if (!show) throw new Error("Show not found");
 
       // Double check if any of these are already booked (shouldn't be if locked, but good practice)
-      const currentBooked = parseBookedSeats(show.booked_seats);
+      const currentBooked = parseBookedSeats(show.bookedSeats);
       const conflict = seatsToBook.some(s => currentBooked.includes(s));
       if (conflict) throw new Error("Seats already permanently booked");
 
@@ -112,12 +112,12 @@ export const confirmBooking = async (req, res) => {
 
       const newBooking = await tx.booking.create({
         data: {
-          user_id: userId,
-          show_id: showId,
+          userId: userId,
+          showId: showId,
           seats: seatsToBook,
-          total_amount: calculatedTotal,
-          payment_method,
-          booking_status: "confirmed"
+          totalAmount: calculatedTotal,
+          paymentMethod,
+          bookingStatus: "confirmed"
         }
       });
 
@@ -125,7 +125,7 @@ export const confirmBooking = async (req, res) => {
       const updatedBookedSeats = [...currentBooked, ...seatsToBook];
       await tx.show.update({
         where: { id: showId },
-        data: { booked_seats: updatedBookedSeats }
+        data: { bookedSeats: updatedBookedSeats }
       });
 
       // 5. Delete Locks
@@ -168,7 +168,7 @@ export const getShowSeatStatus = async (req, res) => {
     const [show, locks] = await Promise.all([
       prisma.show.findUnique({
         where: { id: showId },
-        select: { booked_seats: true }
+        select: { bookedSeats: true }
       }),
       prisma.seatLock.findMany({
         where: { showId: showId },
@@ -178,7 +178,7 @@ export const getShowSeatStatus = async (req, res) => {
 
     if (!show) return res.status(404).json({ error: "Show not found" });
 
-    const booked = parseBookedSeats(show.booked_seats);
+    const booked = parseBookedSeats(show.bookedSeats);
     const locked = locks.map(l => l.seatNumber);
 
     res.json({
@@ -196,7 +196,7 @@ export const getShowSeatStatus = async (req, res) => {
 export const getBookings = async (req, res) => {
   const user_id = req.user.id;
   const bookings = await prisma.booking.findMany({
-    where: { user_id },
+    where: { userId: user_id },
     include: {
       show: {
         include: {
@@ -226,14 +226,73 @@ export const getBooking = async (req, res) => {
 };
 
 export const cancelBooking = async (req, res) => {
-  // Simplistic cancel: just mark as cancelled. 
-  // Ideally should remove from show.booked_seats too if we want to free them up, 
-  // but keeping it simple as per existing logic unless requested otherwise.
-  const booking = await prisma.booking.update({
-    where: { id: req.params.id },
-    data: { booking_status: "cancelled" },
-  });
-  res.json(booking);
+  try {
+    const bookingId = req.params.id;
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { show: true }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    if (booking.bookingStatus === "cancelled") {
+      return res.status(400).json({ error: "Booking is already cancelled" });
+    }
+
+    // Check 2-hour window
+    const showDate = new Date(booking.show.showDate);
+    // showTime is a string "HH:mm AM/PM" or similar. Ideally we parse it.
+    // However, showDate usually has time component set to 00:00:00Z in some setups, or full date.
+    // Schema says `showDate DateTime`, `showTime String`.
+
+    // Let's try to construct the full Date object. 
+    // Assuming showTime is like "14:30" or "02:30 PM". 
+    // If specific parsing logic exists elsewhere we should use it, but for now let's rely on showDate if it includes time,
+    // OR create a helper. 
+    // The seed data from previous tasks might set showDate with time?
+    // Let's assume showDate is the primary date. Use a safe fallback.
+
+    // Simplification: logic only on showDate for now if parsing time is risky without more context.
+    // BUT user requirement is strict "2 hours from now".
+    // I'll try to parse the time if possible, otherwise default to showDate start of day (which is risky).
+
+    // Let's try to combine them.
+    const combinedDate = new Date(booking.show.showDate);
+    const timeString = booking.show.showTime || "00:00";
+
+    // Simple 12h/24h parser
+    const [time, modifier] = timeString.split(' ');
+    let [hours, minutes] = time.split(':');
+
+    if (hours === '12') hours = '00';
+    if (modifier === 'PM') hours = parseInt(hours, 10) + 12;
+
+    combinedDate.setHours(parseInt(hours), parseInt(minutes));
+
+    const now = new Date();
+    const diffMs = combinedDate - now;
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    if (diffHours < 2) {
+      return res.status(400).json({
+        error: "Cannot cancel ticket less than 2 hours before the show."
+      });
+    }
+
+    // Proceed to cancel
+    const updatedBooking = await prisma.booking.update({
+      where: { id: bookingId },
+      data: { bookingStatus: "cancelled" },
+    });
+
+    res.json(updatedBooking);
+
+  } catch (error) {
+    console.error("Cancel Booking Error:", error);
+    res.status(500).json({ error: "Failed to cancel booking" });
+  }
 };
 
 // Kept this for backward compatibility or if used elsewhere, 
@@ -272,9 +331,9 @@ export const createEventBooking = async (req, res) => {
           language: "English",
           duration: 180,
           rating: 5.0,
-          poster_url: event_image || "",
-          trailer_url: "",
-          release_date: event_date ? new Date(event_date) : new Date(),
+          posterUrl: event_image || "",
+          trailerUrl: "",
+          releaseDate: event_date ? new Date(event_date) : new Date(),
           director: "Event Organizer",
           cast: ["Various Artists"],
         },
@@ -289,7 +348,7 @@ export const createEventBooking = async (req, res) => {
           name: venue_name,
           city: venue_city || "Mumbai",
           address: venue_address || `${venue_name}, ${venue_city || "Mumbai"}`,
-          total_screens: 1,
+          totalScreens: 1,
         }
       });
     }
@@ -299,26 +358,26 @@ export const createEventBooking = async (req, res) => {
     showDate.setHours(16, 0, 0, 0);
 
     let show = await prisma.show.findFirst({
-      where: { movie_id: movie.id, theater_id: theater.id, show_date: showDate }
+      where: { movieId: movie.id, theaterId: theater.id, showDate: showDate }
     });
 
     if (!show) {
       show = await prisma.show.create({
         data: {
-          movie_id: movie.id,
-          theater_id: theater.id,
-          screen_number: 1,
-          show_date: showDate,
-          show_time: event_time || "4:00 PM",
-          total_seats: 5000,
+          movieId: movie.id,
+          theaterId: theater.id,
+          screenNumber: 1,
+          showDate: showDate,
+          showTime: event_time || "4:00 PM",
+          totalSeats: 5000,
           price: 1500,
-          booked_seats: [],
+          bookedSeats: [],
         }
       });
     }
 
     // 4. Check/Book
-    const alreadyBooked = parseBookedSeats(show.booked_seats);
+    const alreadyBooked = parseBookedSeats(show.bookedSeats);
     const conflict = seats.some((s) => alreadyBooked.includes(s));
     if (conflict) {
       return res.status(400).json({ error: "One or more seats are already booked" });
@@ -326,18 +385,18 @@ export const createEventBooking = async (req, res) => {
     const newBookedSeats = [...alreadyBooked, ...seats];
     await prisma.show.update({
       where: { id: show.id },
-      data: { booked_seats: newBookedSeats },
+      data: { bookedSeats: newBookedSeats },
     });
 
     const calculatedTotal = total_amount || (seats.length * show.price);
     const booking = await prisma.booking.create({
       data: {
-        user_id,
-        show_id: show.id,
+        userId: user_id,
+        showId: show.id,
         seats,
-        total_amount: calculatedTotal,
-        payment_method,
-        booking_status: "confirmed",
+        totalAmount: calculatedTotal,
+        paymentMethod: payment_method,
+        bookingStatus: "confirmed",
       },
       include: { show: { include: { movie: true, theater: true } } },
     });

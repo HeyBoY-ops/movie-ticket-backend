@@ -3,7 +3,7 @@ import prisma from "../config/db.js";
 export const getShows = async (req, res) => {
   try {
     const { movie_id } = req.query;
-    const where = movie_id ? { movie_id } : {};
+    const where = movie_id ? { movieId: movie_id } : {};
     const shows = await prisma.show.findMany({
       where,
       include: { movie: true, theater: true },
@@ -44,14 +44,14 @@ export const createShow = async (req, res) => {
 
     const show = await prisma.show.create({
       data: {
-        movie_id,
-        theater_id,
-        screen_number: screen_number || 1,
-        show_date: new Date(show_date),
-        show_time,
-        total_seats: total_seats || 100,
+        movieId: movie_id,
+        theaterId: theater_id,
+        screenNumber: screen_number || 1,
+        showDate: new Date(show_date),
+        showTime: show_time,
+        totalSeats: total_seats || 100,
         price: Number(price),
-        booked_seats: [],
+        bookedSeats: [],
       },
     });
     res.status(201).json(show);
@@ -67,12 +67,20 @@ export const updateShow = async (req, res) => {
     if (!id) return res.status(400).json({ error: "Invalid show ID" });
 
     const data = { ...req.body };
+    // Map input fields manually if they come in as snake_case, or assume camelCase input. 
+    // Given the form uses snake_case keys (mostly), we map them.
     if (data.show_date) {
-      data.show_date = new Date(data.show_date);
+      data.showDate = new Date(data.show_date);
+      delete data.show_date;
     }
-    if (data.price) {
-      data.price = Number(data.price);
-    }
+    if (data.price) data.price = Number(data.price);
+
+    // Map others
+    if (data.movie_id) { data.movieId = data.movie_id; delete data.movie_id; }
+    if (data.theater_id) { data.theaterId = data.theater_id; delete data.theater_id; }
+    if (data.screen_number) { data.screenNumber = data.screen_number; delete data.screen_number; }
+    if (data.show_time) { data.showTime = data.show_time; delete data.show_time; }
+    if (data.total_seats) { data.totalSeats = data.total_seats; delete data.total_seats; }
 
     const show = await prisma.show.update({
       where: { id },
@@ -102,7 +110,7 @@ export const deleteShow = async (req, res) => {
 
     // Delete all associated bookings first
     await prisma.booking.deleteMany({
-      where: { show_id: id },
+      where: { showId: id },
     });
 
     // Now delete the show

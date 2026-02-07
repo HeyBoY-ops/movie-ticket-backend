@@ -1,4 +1,5 @@
 import prisma from "../config/db.js";
+import { createMovie as createMovieService } from "../services/movieService.js";
 
 export const getMovies = async (req, res) => {
   try {
@@ -23,7 +24,9 @@ export const getMovies = async (req, res) => {
     }
 
     if (genre) {
-      where.genre = { contains: genre, mode: "insensitive" };
+      // Prisma Mongo: For String[] use 'has'. 'mode: insensitive' is not supported for 'has',
+      // so we rely on frontend sending correct casing (Title Case).
+      where.genre = { has: genre };
     }
 
     if (language) {
@@ -31,7 +34,11 @@ export const getMovies = async (req, res) => {
     }
 
     if (category) {
-      where.category = { equals: category };
+      where.category = { equals: category, mode: "insensitive" };
+    }
+
+    if (req.query.ownerId) {
+      where.ownerId = req.query.ownerId;
     }
 
     let orderBy = {};
@@ -44,12 +51,9 @@ export const getMovies = async (req, res) => {
         break;
       case "release_date":
       default:
-        orderBy = { release_date: "desc" }; // Assuming release_date exists, or fall back to created_at
+        orderBy = { releaseDate: "desc" };
         break;
     }
-
-    // Handle case where release_date might not exist on model, fallback to id for stability if needed
-    // But assuming standard schema from context
 
     const [movies, total] = await Promise.all([
       prisma.movie.findMany({
@@ -92,53 +96,35 @@ export const getMovie = async (req, res) => {
   }
 };
 
-export const createMovie = async (req, res) => {
+// ADD MOVIE (Organization Only)
+export const addMovie = async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      genre,
-      language,
-      duration,
-      rating,
-      poster_url,
-      trailer_url,
-      release_date,
-      director,
-      cast,
-      category,
-    } = req.body;
-
-    if (!title) return res.status(400).json({ error: "Title is required" });
-
-    const movie = await prisma.movie.create({
-      data: {
-        title,
-        description,
-        language,
-        poster_url,
-        trailer_url,
-        director,
-        genre: Array.isArray(genre) ? genre : [genre], // Ensure array
-        cast: Array.isArray(cast) ? cast : [cast], // Ensure array (Json type but usually array)
-        duration: duration ? Number(duration) : null,
-        rating: rating ? Number(rating) : null,
-        release_date: release_date ? new Date(release_date) : null,
-        category: category || "MOVIE",
-      },
-    });
-
-    res.status(201).json(movie);
-  } catch (error) {
-    console.error("Error creating movie:", error);
-    res.status(500).json({ error: "Failed to create movie" });
+    const newMovie = await createMovieService(req.body, req.user.id);
+    res.status(201).json(newMovie);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
+
+// Create Movie (Legacy/Public? Keeping for compatibility if needed, but addMovie is the new one)
+// Ideally we replace createMovie with addMovie or keep them distinct. 
+// For this architecture, addMovie IS createMovie.
+export const createMovie = addMovie;
 
 export const updateMovie = async (req, res) => {
   try {
     const { id } = req.params;
     if (!id) return res.status(400).json({ error: "Invalid movie ID" });
+
+    // Check ownership if user is ORGANIZATION
+    if (req.user.role === "ORGANIZATION") {
+      const movie = await prisma.movie.findUnique({ where: { id } });
+      if (!movie) return res.status(404).json({ error: "Movie not found" });
+
+      if (movie.ownerId !== req.user.id) {
+        return res.status(403).json({ error: "You are not authorized to update this movie" });
+      }
+    }
 
     const data = { ...req.body };
     // Ensure genre is array
@@ -152,10 +138,13 @@ export const updateMovie = async (req, res) => {
 
     if (data.duration) data.duration = Number(data.duration);
     if (data.rating) data.rating = Number(data.rating);
-    if (data.release_date) data.release_date = new Date(data.release_date);
+    if (data.release_date) {
+      data.releaseDate = new Date(data.release_date);
+      delete data.release_date;
+    }
 
-    const movie = await prisma.movie.update({ where: { id }, data });
-    res.status(200).json(movie);
+    const updatedMovie = await prisma.movie.update({ where: { id }, data });
+    res.status(200).json(updatedMovie);
   } catch (error) {
     console.error("Error updating movie:", error);
     if (error.code === "P2025") return res.status(404).json({ error: "Movie not found" });
@@ -178,17 +167,22 @@ export const deleteMovie = async (req, res) => {
       return res.status(404).json({ error: "Movie not found" });
     }
 
+    // Check ownership if user is ORGANIZATION
+    if (req.user.role === "ORGANIZATION" && movie.ownerId !== req.user.id) {
+      return res.status(403).json({ error: "You are not authorized to delete this movie" });
+    }
+
     // Delete all associated shows and bookings first (cascade delete)
     if (movie.shows && movie.shows.length > 0) {
       // Delete all bookings for these shows
       const showIds = movie.shows.map((show) => show.id);
       await prisma.booking.deleteMany({
-        where: { show_id: { in: showIds } },
+        where: { showId: { in: showIds } },
       });
 
       // Delete all shows
       await prisma.show.deleteMany({
-        where: { movie_id: id },
+        where: { movieId: id },
       });
     }
 

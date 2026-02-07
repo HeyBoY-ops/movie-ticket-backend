@@ -11,21 +11,30 @@ datasource db {
 
 enum Role {
   USER
+  SUPER_ADMIN
   ADMIN
   ORGANIZATION
 }
 
-model User {
-  id        String    @id @default(auto()) @map("_id") @db.ObjectId
-  name      String
-  email     String    @unique
-  password  String
-  role      Role      @default(USER)
-  isVerified Boolean  @default(false)
-  organizationDetails Json?
-  createdAt DateTime  @default(now())
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
 
-  bookings  Booking[]
+model User {
+  id                 String             @id @default(auto()) @map("_id") @db.ObjectId
+  name               String
+  email              String             @unique
+  password           String
+  role               Role               @default(USER)
+  verificationStatus VerificationStatus @default(PENDING)
+  organizationDetails Json?
+  createdAt          DateTime           @default(now())
+
+  bookings           Booking[]
+  movies             Movie[]            @relation("OrgMovies")
+  theaters           Theater[]          @relation("OrgTheaters")
 }
 
 model Movie {
@@ -36,13 +45,14 @@ model Movie {
   language     String?
   duration     Int?
   rating       Float?
-  poster_url   String?
-  trailer_url  String?
-  release_date DateTime?
+  posterUrl   String?
+  trailerUrl  String?
+  releaseDate DateTime?
   director     String?
   cast         Json?
   isFlagged    Boolean  @default(false)
-  ownerId      String?  @db.ObjectId
+  ownerId      String?   @db.ObjectId
+  owner        User?     @relation("OrgMovies", fields: [ownerId], references: [id])
   category     String   @default("MOVIE")
   createdAt    DateTime @default(now())
 
@@ -54,41 +64,42 @@ model Theater {
   name          String
   city          String
   address       String
-  total_screens Int
+  totalScreens Int
   ownerId       String?   @db.ObjectId
+  owner         User?     @relation("OrgTheaters", fields: [ownerId], references: [id])
 
   shows         Show[]
 }
 
 model Show {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
-  movie_id      String    @db.ObjectId
-  theater_id    String    @db.ObjectId
-  screen_number Int
-  show_date     DateTime
-  show_time     String
-  total_seats   Int
+  movieId      String?    @db.ObjectId
+  theaterId    String?    @db.ObjectId
+  screenNumber Int
+  showDate     DateTime
+  showTime     String
+  totalSeats   Int
   price         Float
-  booked_seats  Json      @default("[]")
+  bookedSeats  Json      @default("[]")
 
-  movie         Movie     @relation(fields: [movie_id], references: [id])
-  theater       Theater   @relation(fields: [theater_id], references: [id])
+  movie         Movie?     @relation(fields: [movieId], references: [id])
+  theater       Theater?   @relation(fields: [theaterId], references: [id])
   bookings      Booking[]
 }
 
 
 model Booking {
   id             String    @id @default(auto()) @map("_id") @db.ObjectId
-  user_id        String    @db.ObjectId
-  show_id        String    @db.ObjectId
+  userId        String?    @db.ObjectId
+  showId        String?    @db.ObjectId
   seats          Json      @default("[]")
-  total_amount   Float
-  payment_method String
-  booking_status String    @default("confirmed")
+  totalAmount   Float?
+  paymentMethod String?
+  bookingStatus String?    @default("confirmed")
   createdAt      DateTime  @default(now())
 
-  user           User      @relation(fields: [user_id], references: [id])
-  show           Show      @relation(fields: [show_id], references: [id])
+  user           User?      @relation(fields: [userId], references: [id])
+  show           Show?      @relation(fields: [showId], references: [id])
 }
 
 // TTL Index must be manually created on createdAt for automatic expiration (e.g. 10 mins)

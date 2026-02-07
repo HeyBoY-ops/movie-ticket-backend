@@ -1,6 +1,82 @@
 import prisma from "../config/db.js";
 
-// Verify an Entity (User or Organization)
+export const approveOrganization = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const updated = await prisma.user.update({
+      where: { id },
+      data: { verificationStatus: "APPROVED" }
+    });
+    res.status(200).json({ message: "Organization Approved", user: updated });
+  } catch (error) {
+    res.status(500).json({ message: "Error approving organization" });
+  }
+};
+
+// Get Pending Organizations (DEBUG MODE)
+export const getPendingOrganizations = async (req, res) => {
+  try {
+    // 1. Debug: Count all users
+    const totalUsers = await prisma.user.count();
+    console.log(`[DEBUG] Total Users in DB: ${totalUsers}`);
+
+    // 2. Debug: Count specific filters
+    const pendingCount = await prisma.user.count({
+      where: { role: "ORGANIZATION", verificationStatus: "PENDING" }
+    });
+    console.log(`[DEBUG] Pending Orgs Count: ${pendingCount}`);
+
+    // TEMPORARY: Return ALL users to see what's in the DB
+    const organizations = await prisma.user.findMany({
+      where: {
+        role: "ORGANIZATION",
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true, // Show role
+        verificationStatus: true,
+        organizationDetails: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    console.log(`[DEBUG] Returning ${organizations.length} users for inspection`);
+    res.json(organizations);
+  } catch (error) {
+    console.error("Get Pending Orgs Error:", error);
+    res.status(500).json({ error: "Failed to fetch pending organizations" });
+  }
+};
+
+// Verify Organization (Approve/Reject)
+export const verifyOrganization = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body; // 'APPROVED' or 'REJECTED'
+
+    if (!["APPROVED", "REJECTED"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: {
+        verificationStatus: status,
+        // If rejected, maybe we don't delete immediately but just mark rejected
+      },
+    });
+
+    res.json({ message: `Organization ${status}`, user: updatedUser });
+  } catch (error) {
+    console.error("Verify Org Error:", error);
+    res.status(500).json({ error: "Failed to verify organization" });
+  }
+};
+
+// Verify an Entity (Generic - kept for backward compatibility if needed, but updated to use Enum)
 export const verifyEntity = async (req, res) => {
   try {
     const { userId } = req.body;
@@ -8,7 +84,7 @@ export const verifyEntity = async (req, res) => {
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: { isVerified: true },
+      data: { verificationStatus: "APPROVED" },
     });
 
     res.json({ message: "Entity verified successfully", user: updatedUser });

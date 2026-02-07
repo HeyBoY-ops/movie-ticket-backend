@@ -1,9 +1,10 @@
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import prisma from "../config/db.js";
 
 dotenv.config();
 
-export const authMiddleware = (req, res, next) => {
+export const authMiddleware = async (req, res, next) => {
   try {
     const authHeader =
       req.headers.authorization || req.headers.Authorization;
@@ -21,16 +22,27 @@ export const authMiddleware = (req, res, next) => {
     // decode token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // attach user data including role
+    // Fetch fresh user data from DB to get real-time verification status
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { id: true, email: true, role: true, verificationStatus: true }
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    // attach user data including computed isVerified
     req.user = {
-      id: decoded.id,
-      email: decoded.email,
-      role: decoded.role,    
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      isVerified: user.verificationStatus === "APPROVED",
     };
 
     next();
   } catch (err) {
-    console.error("JWT Error:", err.message);
+    console.error("Auth Middleware Error:", err.message);
 
     return res.status(401).json({
       message:
