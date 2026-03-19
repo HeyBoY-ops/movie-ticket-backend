@@ -30,7 +30,8 @@ app.use(
       "http://localhost:5173",
       "https://movie-ticket-app-drab.vercel.app",
       "https://movie-ticket-backend-d25t.onrender.com",
-      "https://movie-ticket-hd97rm242-abhisheks-projects-a1a026b5.vercel.app"
+      "https://movie-ticket-hd97rm242-abhisheks-projects-a1a026b5.vercel.app",
+      "https://movie-ticket-ko9ihu3up-abhisheks-projects-a1a026b5.vercel.app"
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],

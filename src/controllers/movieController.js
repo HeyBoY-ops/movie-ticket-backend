@@ -44,14 +44,14 @@ export const getMovies = async (req, res) => {
     let orderBy = {};
     switch (sort_by) {
       case "rating":
-        orderBy = { rating: "desc" };
+        orderBy = [{ rating: "desc" }, { id: "desc" }];
         break;
       case "title":
-        orderBy = { title: "asc" };
+        orderBy = [{ title: "asc" }, { id: "desc" }];
         break;
       case "release_date":
       default:
-        orderBy = { releaseDate: "desc" };
+        orderBy = [{ releaseDate: "desc" }, { id: "desc" }];
         break;
     }
 

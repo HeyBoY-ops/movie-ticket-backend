@@ -97,8 +97,9 @@ const seedFromTMDB = async () => {
         language: tmdbMovie.original_language === 'en' ? "English" : randoLang,
         duration: runtime,
         rating: tmdbMovie.vote_average,
-        poster_url: tmdbMovie.poster_path ? `${IMAGE_BASE_URL}${tmdbMovie.poster_path}` : null,
-        trailer_url: "", // Not robustly available in list endpoint
+        rating: tmdbMovie.vote_average,
+        posterUrl: tmdbMovie.poster_path ? `${IMAGE_BASE_URL}${tmdbMovie.poster_path}` : null,
+        trailerUrl: "", // Not robustly available in list endpoint
         release_date: new Date(tmdbMovie.release_date),
         director: "Unknown", // Requires credits endpoint, skipping for MVP speed
         cast: [], // Requires credits endpoint

@@ -13,11 +13,14 @@ async function main() {
     language: "English",
     duration: 180, // 3 hours
     rating: 5.0,
-    poster_url: "https://wanderon-images.gumlet.io/blogs/new/2024/09/sunburn-arena-ft.-alan-walker-timing-and-date.png",
-    trailer_url: "",
+    rating: 5.0,
+    posterUrl: "https://wanderon-images.gumlet.io/blogs/new/2024/09/sunburn-arena-ft.-alan-walker-timing-and-date.png",
+    trailerUrl: "",
     release_date: new Date("2024-12-14"),
     director: "Sunburn",
     cast: ["Alan Walker"],
+    category: "EVENT",
+    category: "EVENT",
   };
 
   let movie = await prisma.movie.findFirst({

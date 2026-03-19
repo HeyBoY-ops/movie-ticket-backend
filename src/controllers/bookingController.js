@@ -5,26 +5,17 @@ import prisma from "../config/db.js";
 // 1. Hold Seat (Locking Mechanism)
 export const holdSeat = async (req, res) => {
   const { showId, seatNumbers } = req.body;
-  const userId = req.user.id;
+  const userId = req.user.id; // Corrected User ID
 
   if (!showId || !seatNumbers || !Array.isArray(seatNumbers) || seatNumbers.length === 0) {
     return res.status(400).json({ error: "Show ID and seat numbers are required" });
   }
 
-  // Basic validation that show exists and isn't finished (omitted for brevity, can be added)
-
   const lockIds = [];
 
   try {
-    // Attempt to create locks for all seats
-    // We do this in a loop or Promise.all. 
-    // However, for strict consistency, we want to fail if ANY seat is taken.
-    // Prisma transaction makes sure we either get all or nothing if we want, 
-    // but duplicate keys throw immediately.
-
-    // We'll use a transaction to try and create all locks.
     await prisma.$transaction(async (tx) => {
-      // First, check if any are already BOOKED in the Show record (double check)
+      // 1. Check Permanent Bookings
       const show = await tx.show.findUnique({ where: { id: showId } });
       if (!show) throw new Error("Show not found");
 
@@ -37,8 +28,45 @@ export const holdSeat = async (req, res) => {
         throw error;
       }
 
-      // Try to create locks
-      for (const seatNumber of seatNumbers) {
+      // 2. Cleanup Expired Locks for these specific seats
+      // (Global cleanup task is better, but this ensures availability for this request)
+      const lockDurationBeforeExpiry = 10 * 60 * 1000; // 10 minutes
+      const expiryTime = new Date(Date.now() - lockDurationBeforeExpiry);
+
+      await tx.seatLock.deleteMany({
+        where: {
+          showId: showId,
+          seatNumber: { in: seatNumbers },
+          createdAt: { lt: expiryTime }
+        }
+      });
+
+      // 3. Check for Conflicting Active Locks
+      const existingLocks = await tx.seatLock.findMany({
+        where: {
+          showId: showId,
+          seatNumber: { in: seatNumbers }
+        }
+      });
+
+      const conflictLocks = existingLocks.filter(lock => lock.userId !== userId);
+      if (conflictLocks.length > 0) {
+        const error = new Error("Seats are reserved by another user. Please select other seats.");
+        error.code = "SEAT_LOCKED";
+        throw error;
+      }
+
+      // 4. Create or Reuse Locks
+      // existingLocks now only contains locks belonging to CURRENT USER (or empty).
+      // We reuse them to avoid "P2002" unique constraint error on re-click.
+
+      const seatsToLock = seatNumbers.filter(seat => !existingLocks.find(l => l.seatNumber === seat));
+
+      // Push existing IDs
+      existingLocks.forEach(l => lockIds.push(l.id));
+
+      // Create new ones
+      for (const seatNumber of seatsToLock) {
         const lock = await tx.seatLock.create({
           data: {
             showId,
@@ -53,17 +81,17 @@ export const holdSeat = async (req, res) => {
     res.status(201).json({
       message: "Seats locked successfully",
       lockIds,
-      expiresInSeconds: 600 // 10 minutes
+      expiresInSeconds: 600
     });
 
   } catch (error) {
     console.error("Hold Seat Error:", error);
 
     if (error.code === 'P2002') {
-      return res.status(409).json({ error: "One or more seats are already reserved by another user." });
+      // Fallback catch if race condition happened between find and create
+      return res.status(409).json({ error: "Seats were just taken by another user." });
     }
-
-    if (error.code === 'SEAT_BOOKED') {
+    if (error.code === 'SEAT_BOOKED' || error.code === 'SEAT_LOCKED') {
       return res.status(409).json({ error: error.message });
     }
 
@@ -116,7 +144,7 @@ export const confirmBooking = async (req, res) => {
           showId: showId,
           seats: seatsToBook,
           totalAmount: calculatedTotal,
-          paymentMethod,
+          paymentMethod: payment_method,
           bookingStatus: "confirmed"
         }
       });
