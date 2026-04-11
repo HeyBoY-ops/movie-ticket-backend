@@ -4,7 +4,7 @@
   "main": "src/server.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon src/server.js",
+    "dev": "nodemon -e js,mjs,json,env src/server.js",
     "start": "node src/server.js",
     "build": "npx prisma generate"
   },
@@ -13,6 +13,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^6.19.0",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.2",
@@ -21,7 +22,9 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.15.3",
-    "prisma": "^6.19.0"
+    "openai": "^6.34.0",
+    "prisma": "^6.19.0",
+    "razorpay": "^2.9.6"
   },
   "devDependencies": {
     "baseline-browser-mapping": "^2.9.14",

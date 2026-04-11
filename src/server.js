@@ -1,7 +1,6 @@
-
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
 
 // Routes
@@ -11,8 +10,10 @@ import theaterRoutes from "./routes/theaterRoutes.js";
 import showRoutes from "./routes/showRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import chatRoutes from "./routes/chatRoutes.js";
 
-dotenv.config();
+
+// Routes
 
 const app = express();
 import prisma from "./config/db.js";
@@ -71,6 +72,7 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/admin", adminRoutes);
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/chat", chatRoutes);
 
 // 404 handler
 app.use((req, res) => {

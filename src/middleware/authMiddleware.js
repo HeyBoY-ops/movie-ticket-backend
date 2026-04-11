@@ -10,17 +10,25 @@ export const authMiddleware = async (req, res, next) => {
       req.headers.authorization || req.headers.Authorization;
 
     if (!authHeader?.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Unauthorized" });
+      console.error("Auth Middleware Error: Auth header missing or malformed", authHeader);
+      return res.status(401).json({ message: "Unauthorized: Missing header" });
     }
 
     const token = authHeader.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ message: "Unauthorized" });
+      console.error("Auth Middleware Error: Token missing in Bearer header");
+      return res.status(401).json({ message: "Unauthorized: Missing token string" });
     }
 
     // decode token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      console.error("Auth Middleware Error: JWT Verification Failed", err.message);
+      throw err;
+    }
 
     // Fetch fresh user data from DB to get real-time verification status
     const user = await prisma.user.findUnique({
@@ -29,6 +37,7 @@ export const authMiddleware = async (req, res, next) => {
     });
 
     if (!user) {
+      console.error("Auth Middleware Error: User not found in DB for ID:", decoded.id);
       return res.status(401).json({ message: "User not found" });
     }
 

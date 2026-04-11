@@ -96,6 +96,9 @@ model Booking {
   totalAmount   Float?
   paymentMethod String?
   bookingStatus String?    @default("confirmed")
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  razorpaySignature String?
   createdAt      DateTime  @default(now())
 
   user           User?      @relation(fields: [userId], references: [id])

@@ -1,4 +1,11 @@
 import prisma from "../config/db.js";
+import Razorpay from "razorpay";
+import crypto from "crypto";
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 // --- CORE RESERVATION LOGIC ---
 
@@ -171,6 +178,115 @@ export const confirmBooking = async (req, res) => {
   } catch (error) {
     console.error("Confirm Booking Error:", error);
     res.status(409).json({ error: error.message || "Booking failed" });
+  }
+};
+
+// 3. Razorpay: Create Order
+export const createRazorpayOrder = async (req, res) => {
+  const { amount, currency = "INR", receipt } = req.body;
+
+  try {
+    const options = {
+      amount: Math.round(amount * 100), // Razorpay expects amount in paise
+      currency,
+      receipt: receipt || `receipt_${Date.now()}`,
+    };
+
+    const order = await razorpay.orders.create(options);
+    res.json(order);
+  } catch (error) {
+    console.error("Razorpay Order Error:", error);
+    res.status(500).json({ error: "Failed to create Razorpay order" });
+  }
+};
+
+// 4. Razorpay: Verify Payment and Confirm Booking
+export const verifyRazorpayPayment = async (req, res) => {
+  const {
+    razorpay_order_id,
+    razorpay_payment_id,
+    razorpay_signature,
+    showId,
+    lockIds,
+    total_amount
+  } = req.body;
+
+  const userId = req.user.id;
+
+  // 1. Verify Signature
+  const body = razorpay_order_id + "|" + razorpay_payment_id;
+  const expectedSignature = crypto
+    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+    .update(body.toString())
+    .digest("hex");
+
+  if (expectedSignature !== razorpay_signature) {
+    return res.status(400).json({ error: "Invalid payment signature" });
+  }
+
+  // 2. Proceed with booking confirmation (similar to confirmBooking but with Razorpay details)
+  try {
+    const booking = await prisma.$transaction(async (tx) => {
+      // a. Verify locks
+      const locks = await tx.seatLock.findMany({
+        where: {
+          id: { in: lockIds },
+          userId: userId,
+          showId: showId
+        }
+      });
+
+      if (locks.length !== lockIds.length) {
+        throw new Error("Locks expired or invalid during verification");
+      }
+
+      const seatsToBook = locks.map(l => l.seatNumber);
+
+      // b. Fetch Show
+      const show = await tx.show.findUnique({ where: { id: showId } });
+      if (!show) throw new Error("Show not found during verification");
+
+      const currentBooked = parseBookedSeats(show.bookedSeats);
+      const conflict = seatsToBook.some(s => currentBooked.includes(s));
+      if (conflict) throw new Error("Seats were booked by another transaction");
+
+      // c. Create Booking with Razorpay details
+      const newBooking = await tx.booking.create({
+        data: {
+          userId: userId,
+          showId: showId,
+          seats: seatsToBook,
+          totalAmount: total_amount || (seatsToBook.length * show.price),
+          paymentMethod: "razorpay",
+          bookingStatus: "confirmed",
+          razorpayOrderId: razorpay_order_id,
+          razorpayPaymentId: razorpay_payment_id,
+          razorpaySignature: razorpay_signature
+        }
+      });
+
+      // d. Update Show
+      const updatedBookedSeats = [...currentBooked, ...seatsToBook];
+      await tx.show.update({
+        where: { id: showId },
+        data: { bookedSeats: updatedBookedSeats }
+      });
+
+      // e. Delete Locks
+      await tx.seatLock.deleteMany({
+        where: {
+          id: { in: lockIds }
+        }
+      });
+
+      return newBooking;
+    });
+
+    res.status(201).json(booking);
+
+  } catch (error) {
+    console.error("Razorpay Verification/Booking Error:", error);
+    res.status(409).json({ error: error.message || "Payment verification succeeded but booking failed" });
   }
 };
 

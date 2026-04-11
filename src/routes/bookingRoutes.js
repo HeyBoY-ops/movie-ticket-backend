@@ -7,6 +7,8 @@ import {
   getBookings,
   cancelBooking,
   getBooking,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
 } from "../controllers/bookingController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
@@ -14,7 +16,9 @@ const router = express.Router();
 
 router.post("/hold", authMiddleware, holdSeat);
 router.post("/confirm", authMiddleware, confirmBooking);
-router.get("/status/:showId", getShowSeatStatus); // Public or Auth? Usually Public is fine for checking seats
+router.get("/status/:showId", getShowSeatStatus);
+router.post("/razorpay/order", authMiddleware, createRazorpayOrder);
+router.post("/razorpay/verify", authMiddleware, verifyRazorpayPayment);
 
 router.post("/event", authMiddleware, createEventBooking);
 router.get("/", authMiddleware, getBookings);
